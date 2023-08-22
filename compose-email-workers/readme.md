@@ -231,3 +231,19 @@ docker-compose up -d --scale worker=3
 ```sh
 docker-compose exec db psql -U postgres -d email_sender -c 'SELECT * FROM emails'
 ```
+
+
+### Override
+
+- Criei o arquivo [docker-compose.override.yml](docker-compose.override.yml);
+- Em [docker-compose.yml](docker-compose.yml) alterei `DB_NAME` para um nome errado;
+```yml
+version: '3'
+services:
+  app:
+    environment:
+      - DB_NAME=abc_sender
+```
+O objetivo dessas alterações foi testar se o `override` corrigiria um `DB_NAME` errado.
+
+O [docker-compose.override.yml](docker-compose.override.yml) é flexibilizar alterações que não precisam alterar um build ou uma imagem. Neste caso, mesmo com o `environment` errado em [docker-compose.yml](docker-compose.yml) o programa funcionou corretamente.
