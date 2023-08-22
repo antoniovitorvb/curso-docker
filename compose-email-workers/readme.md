@@ -97,21 +97,66 @@ service:
 
 - Adicionei o parâmetro `networks` em [docker-compose.yml](docker-compose.yml) para os serviços `db`, `frontend` e `app` e suas dependências (`depends_on:`);
 - Em [app/app.sh](app/app.sh) adicionei a biblioteca `psycopg2==2.7.3.2` para acessar o banco de dados Postgres;
+---
+#### `Obs.:` Em caso de erros como:
 
-`Obs.:` Em caso de 
+  ```
+  Error: 500 Internal Server
+
+
+OperationalError('FATAL: password authentication failed for user "postgres"\n',)
+  ```
+  1. destive o sistema com o parâmetro `-v` para remover os volumes antigos
+  ```sh
+  docker-compose down -v
+  ```
+  2. Em [docker-compose.yml](docker-compose.yml) adicione:
+  ```yml
+  db:
+    environment:
+        POSTGRES_PASSWORD: postgres
+  ```
+  1. Em [app/sender.py](app/sender.py) altere o `DSN`
+  ```py
+  # De:
+  DSN = 'dbname=email_sender user=postgres host=db'
+  # Para:
+  DSN = 'host=db dbname=email_sender user=postgres password=postgres'
+  ```
+---
+- Para verificar se funcionou, vá em [localhost](localhost) e envie um e-mail;
+- Se a mensagem foi enfileirada, execute no terminal o comando com a query abaixo:
+```sh
+docker-compose exec db psql -U postgres -d email_sender -c 'SELECT * FROM emails'
 ```
-Error: 500 Internal Server
-```
-1. Em [docker-compose.yml](docker-compose.yml) adicione:
-```yml
-db:
-  environment:
-      POSTGRES_PASSWORD: "admin"
-```
-2. Em [app/sender.py](app/sender.py) altere o `DNS`
-```py
-# De:
-DNS = 'dbname=email_sender user=postgres host=db'
-# Para:
-DSN = 'host=db dbname=email_sender user=postgres password=admin'
-```
+
+
+### Filas e Workers
+
+- Nova pasta `worker`
+- Nova rede chamada `fila`;
+- 2 novos serviços: `queue` e `worker`
+    ```yml
+    services:
+      queue:
+        image: redis:3.2
+        networks:
+          - fila
+    
+      worker:
+        image: python:3.6
+        volumes:
+          # Workers
+          - ./worker:/worker
+        working_dir: /worker
+        command: bash ./app.sh
+        networks:
+          - fila
+        depends_on:
+          - queue
+    ```
+- Biblioteca `redis==2.10.5` adicionada a [app/app.sh](app/app.sh);
+- Refatoração em [app/sender.py](app/sender.py):
+  - Novas bibliotecas importadas;
+  - Criada a classe `Sender` para a fila
+- Na pasta `worker/` criei os arquivos `app.sh` para instalar as dependências e `worker.py` para consumir as mensagens da fila `sender` e simular envio dessa mensagem por email.

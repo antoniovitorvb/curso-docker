@@ -1,26 +1,39 @@
-from bottle import route, run, request
+from bottle import Bottle, request
 import psycopg2
+import redis
+import json
 
-DSN = 'host=db dbname=email_sender user=postgres password=admin'
-SQL = 'INSERT INTO emails (assunto, mensagem) VALUES (%s, %s)'
+class Sender(Bottle):
+    def __init__(self):
+        super().__init__(self)
+        self.route('/', method='POST', callback=self.send)
+        self.fila = redis.StrictRedis(host='queue', port=6379, db=0)
+        # DSN = Data Source Name
+        DSN = 'host=db dbname=email_sender user=postgres password=postgres'
+        self.conn = psycopg2.connect(DSN)
 
-def register_message(assunto, mensagem):
-    conn = psycopg2.connect(DSN)
-    cur = conn.cursor()
-    cur.execute(SQL, (assunto, mensagem))
-    conn.commit()
-    cur.close()
-    conn.close()
+    def register_message(self, assunto, mensagem):
+        SQL = 'INSERT INTO emails (assunto, mensagem) VALUES (%s, %s)'
+        cur = self.conn.cursor()
+        cur.execute(SQL, (assunto, mensagem))
+        self.conn.commit()
+        cur.close()
+        # self.conn.close()
+        msg = {'assunto': assunto, 'mensagem': mensagem}
+        self.fila.rpush('sender', json.dumps(msg)) # pega a fila 'sender' e converte para o formato JSON
 
-    print('Mensagem registrada com sucesso!')
+        print('Mensagem registrada com sucesso !')
+    
+    
 
-@route('/', method='POST')
-def send():
-    assunto = request.forms.get('assunto')
-    mensagem = request.forms.get('mensagem')
+    # @route('/', method='POST')
+    def send(self):
+        assunto = request.forms.get('assunto')
+        mensagem = request.forms.get('mensagem')
 
-    register_message(assunto, mensagem)
-    return f"Mensagem enfileirada ! Assunto: {assunto}\nMensagem: {mensagem}"
+        self.register_message(assunto, mensagem)
+        return f"Mensagem enfileirada ! Assunto: {assunto} | Mensagem: {mensagem}"
 
 if __name__ == '__main__':
-    run(host='0.0.0.0', port=8080, debug=True)
+    sender = Sender() # cria a fila
+    sender.run(host='0.0.0.0', port=8080, debug=True)
