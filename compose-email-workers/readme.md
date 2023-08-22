@@ -160,3 +160,27 @@ docker-compose exec db psql -U postgres -d email_sender -c 'SELECT * FROM emails
   - Novas bibliotecas importadas;
   - Criada a classe `Sender` para a fila
 - Na pasta `worker/` criei os arquivos `app.sh` para instalar as dependências e `worker.py` para consumir as mensagens da fila `sender` e simular envio dessa mensagem por email.
+
+
+### Múltiplas instâncias/workers "Escalar é preciso"
+
+- `Dockerfile` criado na pasta `worker/`
+- Em [docker-compose.yml](docker-compose.yml), serviço `worker` foi alterado para:
+```yml
+services:
+  worker:
+    build: worker # vai procurar em worker/Dockerfile
+    volumes:
+      # Workers
+      - ./worker:/worker
+    working_dir: /worker
+    command: worker.py
+    networks:
+      - fila
+    depends_on:
+      - queue
+```
+- Para definir quantos worker serão criados na inicialização execute:
+```sh
+docker-compose up -d --scale worker=3
+```
