@@ -184,3 +184,50 @@ services:
 ```sh
 docker-compose up -d --scale worker=3
 ```
+
+
+### Boas práticas: variáveis de ambiente
+
+- Em [app/sender.py](app/sender.py), ao invés de usar valores fixos para acesso ao BD, foi criado variáveis como:
+```py
+db_host = os.getenv(key='DB_HOST', default='db')
+db_user = os.getenv(key='DB_USER', default='postgres')
+db_name = os.getenv(key='DB_NAME', default='sender')
+```
+---
+`Obs.:` em `db_name`, o parâmetro `default='sender'` foi propositadamente colocado diferente do valor real (`DB_NAME=email_sender`) para testar se o a variável iria buscar o valor correto em [docker-compose.yml](docker-compose.yml)
+```yml
+services:
+  app:
+    environment:
+      - DB_NAME=email_sender
+```
+---
+- No terminal, subi novamente o projeto;
+```sh
+docker-compose up -d --scale worker=3
+```
+---
+`Obs.:` Em caso de
+  ```
+  404 Not Found
+  nginx/1.13.12
+  ```
+  1. Abra [app/sender.py](app/sender.py):
+  
+      Crie uma variável global para senha e altere o `dsn`:
+  ```py
+  db_pw = os.getenv(key='DB_PASSWORD', default='postgres')
+  ```  
+  ```py
+  # De:
+  dsn = f"dbname={db_name} user={db_user} host={db_host}"
+  # Para:
+  dsn = f"host={db_host} dbname={db_name} user={db_user} password={db_pw}"
+  ```
+  2. Reinicie a aplicação
+---
+- Envie um e-mail e consulte se foi guardado no banco de dados corretamente
+```sh
+docker-compose exec db psql -U postgres -d email_sender -c 'SELECT * FROM emails'
+```
